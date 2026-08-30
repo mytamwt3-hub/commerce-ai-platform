@@ -1,7 +1,7 @@
 {
-  "name": "commerce-ai-platform",
+  "name": "منصه-ميتا هوب",
   "version": "1.0.0",
-  "description": "منصة تجارية متكاملة بنظام محاسبي ذكي واستثمار",
+  "description": "منصة ميتاهوب: سوق تمويل واستثمار رقمي داخل المتاجر",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
