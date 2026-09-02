@@ -1,18 +1,76 @@
 name: CI
+
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/investment-routes ]
   pull_request:
     branches: [ main ]
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: test_db
+      REDIS_URL: redis://127.0.0.1:6379
+      INVESTMENT_WEBHOOK_SECRET: testsecret
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
-      - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test --if-present
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER && break
+            echo "Waiting for Postgres... ($i)"
+            sleep 1
+          done
+
+      - name: Run migrations
+        run: |
+          if npm run | grep -q "migrate"; then
+            npm run migrate
+          elif [ -f ./migrations ]; then
+            echo "Migrations directory exists; run your project's migration command via npm script named 'migrate'."
+          fi
+
+      - name: Run tests
+        run: npm test
